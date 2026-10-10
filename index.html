@@ -4,7 +4,91 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>T-Sholick</title>
-<style>
+
+/* T-SHOLICK — Sol panel kaydırma ve isim taşması düzeltmesi */
+#app {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.sideTop {
+  flex: 0 0 auto;
+}
+
+/* Arkadaşlar, gruplar ve istek listeleri panel içinde kayar */
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #46547a transparent;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 12px;
+}
+
+/* Uzun kullanıcı ve grup isimleri kesilmesin */
+.listItem,
+.listName,
+.listSub {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Arkadaş satırındaki avatar ile isim düzgün hizalansın */
+.listItem > div {
+  min-width: 0;
+}
+
+.listItem > div > div:last-child {
+  min-width: 0;
+}
+
+/* Kaydırma çubuğu */
+.list::-webkit-scrollbar {
+  width: 7px;
+}
+
+.list::-webkit-scrollbar-thumb {
+  background: #46547a;
+  border-radius: 10px;
+}
+
+.list::-webkit-scrollbar-thumb:hover {
+  background: #7888bd;
+}
+
+.list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (max-width: 750px) {
+  .sidebar {
+    height: 100dvh;
+    height: 100%;
+  }
+
+  #app:not(.mobile-chat) .sidebar {
+    height: 100dvh;
+  }
+
+  .list {
+    overscroll-behavior: contain;
+  }
+}
+</style>
 :root{color-scheme:dark;--bg:#0b0f14;--panel:#10161d;--panel2:#161e27;--line:#26303b;--blue:#2589ed;--muted:#8996a5;--green:#45d483}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:#fff;height:100vh;overflow:hidden}
