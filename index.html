@@ -701,6 +701,27 @@ button:focus-visible,input:focus-visible{outline:2px solid #91a0ff;outline-offse
   .sidebarLists { overscroll-behavior: contain; }
 }
 
+
+/* Mesaj tepkileri ve düzenleme araçları */
+.message{position:relative;overflow:visible}
+.messageActions{display:flex;gap:4px;justify-content:flex-end;align-items:center;margin-top:5px;opacity:.72;transition:opacity .18s ease}
+.messageAction{border:1px solid #ffffff20;background:#ffffff08;color:#dce6f5;border-radius:7px;padding:4px 8px;font-size:12px;cursor:pointer;transition:background .16s ease,transform .16s ease,border-color .16s ease}
+.messageAction:hover{background:#ffffff18;border-color:#ffffff38}
+.messageAction.iconAction{width:25px;height:25px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:13px;line-height:1;background:transparent;border-color:transparent;color:#bfc8dc}
+.messageAction.iconAction:hover{background:#ffffff16;color:#fff;transform:translateY(-1px)}
+.messageActions .iconAction.deleteAction:hover{background:#ff4d6d20;color:#ff718a;border-color:#ff4d6d35}
+@media (hover:hover){.messageActions{opacity:.35}.message:hover .messageActions{opacity:.9}}
+@media (hover:none){.messageActions{opacity:.78}}
+.messageReaction{display:inline-flex;align-items:center;gap:4px;margin-top:5px;padding:3px 8px;border-radius:14px;background:#e9487020;border:1px solid #e9487040;font-size:13px;min-height:24px}
+.messageReaction:empty{display:none}
+.heartBurst{position:absolute;z-index:5;pointer-events:none;font-size:48px;animation:heartBurst .7s ease-out forwards;left:50%;top:45%;transform:translate(-50%,-50%)}
+@keyframes heartBurst{0%{opacity:0;transform:translate(-50%,-35%) scale(.35)}35%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}100%{opacity:0;transform:translate(-50%,-85%) scale(.8)}}
+.messageEditInput{width:100%;min-width:180px;background:#101923;color:#fff;border:1px solid #4c83c8;border-radius:8px;padding:8px;resize:vertical}
+
+/* İsim ve moderatör etiketi aynı satırda kalsın */
+.messageSender{display:flex!important;align-items:center!important;gap:6px!important;flex-wrap:nowrap!important;white-space:nowrap!important;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.messageSender .badge{display:inline-flex!important;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap!important;line-height:1;padding:4px 7px!important;font-size:9px!important;letter-spacing:.25px;border-radius:999px!important;margin:0!important}
+
 </style>
 </head>
 <body>
@@ -1297,8 +1318,10 @@ function renderMessages(data) {
     return;
   }
 
-  entries.forEach(([, m]) => {
+  entries.forEach(([messageId, m]) => {
     const mine = m.senderId === meUser.usernameKey;
+    const messagePath = currentChat.type === "private" ? `chats/${currentChat.id}/messages/${messageId}` : currentChat.type === "public" ? `publicChat/messages/${messageId}` : `groups/${currentChat.id}/messages/${messageId}`;
+    const messageRef = ref(db, messagePath);
     const user = users[m.senderId] || { username: m.senderName || "Kullanıcı" };
     const line = document.createElement("div");
     line.style.cssText = "display:flex;align-items:flex-end;gap:9px;max-width:88%;align-self:" +
@@ -1345,11 +1368,82 @@ function renderMessages(data) {
       }
     }
 
+    const reaction = document.createElement("div");
+    reaction.className = "messageReaction";
+    reaction.textContent = m.reactions && Object.values(m.reactions).some(Boolean)
+      ? `❤️ ${Object.values(m.reactions).filter(Boolean).length}` : "";
+    reaction.title = "Çift tıklayarak kalp bırak veya kaldır";
+    d.addEventListener("dblclick", async (ev) => {
+      if (ev.target.closest("button,input,textarea,a")) return;
+      const reactionRef = ref(db, `${messagePath}/reactions/${meUser.usernameKey}`);
+      const snap = await get(reactionRef);
+      await set(reactionRef, snap.val() ? null : true);
+      const burst = document.createElement("span");
+      burst.className = "heartBurst";
+      burst.textContent = "❤️";
+      d.appendChild(burst);
+      setTimeout(() => burst.remove(), 750);
+    });
+    d.appendChild(reaction);
+
+    if (mine) {
+      const actions = document.createElement("div");
+      actions.className = "messageActions";
+      const edit = document.createElement("button");
+      edit.className = "messageAction iconAction";
+      edit.type = "button";
+      edit.textContent = "✎";
+      edit.title = "Mesajı düzenle";
+      edit.setAttribute("aria-label", "Mesajı düzenle");
+      edit.onclick = async () => {
+        if (d.querySelector(".messageEditInput")) return;
+        const editor = document.createElement("textarea");
+        editor.className = "messageEditInput";
+        editor.value = m.text || "";
+        editor.maxLength = 4000;
+        const save = document.createElement("button");
+        save.className = "messageAction";
+        save.type = "button";
+        save.textContent = "Kaydet";
+        const cancel = document.createElement("button");
+        cancel.className = "messageAction";
+        cancel.type = "button";
+        cancel.textContent = "İptal";
+        const editorActions = document.createElement("div");
+        editorActions.className = "messageActions";
+        editorActions.append(save, cancel);
+        t.replaceWith(editor);
+        actions.replaceChildren();
+        d.insertBefore(editorActions, reaction);
+        save.onclick = async () => {
+          const value = editor.value.trim();
+          if (!value) return alert("Mesaj boş olamaz.");
+          try { await update(messageRef, { text: value, editedAt: Date.now() }); }
+          catch (err) { alert("Mesaj düzenlenemedi: " + (err.message || err)); }
+        };
+        cancel.onclick = () => renderMessages(data);
+        editor.focus();
+      };
+      const del = document.createElement("button");
+      del.className = "messageAction iconAction deleteAction";
+      del.type = "button";
+      del.textContent = "⌫";
+      del.title = "Mesajı sil";
+      del.setAttribute("aria-label", "Mesajı sil");
+      del.onclick = async () => {
+        if (!confirm("Bu mesajı silmek istiyor musun?")) return;
+        try { await remove(messageRef); }
+        catch (err) { alert("Mesaj silinemedi: " + (err.message || err)); }
+      };
+      actions.append(edit, del);
+      d.appendChild(actions);
+    }
+
     const tm = document.createElement("div");
     tm.className = "messageTime";
-    tm.textContent = m.createdAt
+    tm.textContent = (m.createdAt
       ? new Date(m.createdAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
-      : "";
+      : "") + (m.editedAt ? " · düzenlendi" : "");
     d.appendChild(tm);
     line.append(av, d);
     box.appendChild(line);
